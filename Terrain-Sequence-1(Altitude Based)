@@ -1,0 +1,230 @@
+!pip install noise
+import noise
+from math import floor
+from math import sin
+import numpy as np
+import torch
+import matplotlib
+from matplotlib.pyplot import imshow
+import random
+import math
+def generator(world_type,detail=5,persistence=0.5,lacunarity=2):
+  shape = (256,512)
+  scale = 60*(('giant' in world_type)*5+1)*(1-0.63*('archipelago' in world_type))
+  octaves = detail
+  random_='lol'
+  try :
+    seed,notherseed=int(random_[0:2]),int(random_[2:4])
+  except :
+    seed=random.randint(1,100)
+    notherseed=random.randint(1,100)
+  world,temp,mo,age,shulk = (np.zeros(shape),np.zeros(shape),np.zeros(shape),np.zeros(shape),np.zeros(shape))
+  print('loading terrain')
+  for i in range(shape[0]):
+      for j in range(shape[1]):
+        assign=noise.pnoise2(0.8*i/scale,0.8*j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=seed)
+        oh_really=noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=(seed+notherseed))
+        assign*=10
+        if assign < -1 :
+          assign = -1*(assign+1)*0.5
+        assign=(assign+1)
+        world[i][j]=assign-2
+        if oh_really > 0.16 and oh_really  < 0.2 and world[i][j] > 0.3:
+          world[i][j]=3+sin(30*oh_really+assign)
+        if oh_really > 0.2 and oh_really < 0.28 and world[i][j] > 1 or (not (0.16<oh_really<0.2)) and world[i][j]>2:
+          world[i][j]=2
+        if world[i][j] > 0 and oh_really < -0.08 :
+          world[i][j]=abs((abs(world[i][j]-1)*(-1)+2)*2)**2/4.5
+        if world[i][j] >= 0 :
+          world[i][j]**=2
+          world[i][j]/=4
+        absign=abs(assign)
+        temp[i][j] = 1.2*(40+(-70*abs(((shape[0]//2)-i)/shape[0]))-(5*absign))+35*abs(((shape[0]//2)-i)/shape[0])**2-1.5
+        mo[i][j] = abs((0.5-abs(((shape[0]//2)-i)/shape[0]))**1.8*800-(75*(8<(abs(((shape[0]//2)-i)/shape[0])*180)<35)-25*(50<(abs(((shape[0]//2)-i)/shape[0])*180)<60)+(35*(13<(abs(((shape[0]//2)-i)/shape[0])*180)<32)))-10+assign*5)
+        if i == 100 and j == 0 :
+          print('loading temperature')
+        if i == 200 and j == 0 :
+          print('building ranges')
+  # isthmi=[]
+  # if not isthmi:
+  #   print('creating isthmi and peninsulae')
+  #   for i in range(shape[0]):
+  #     for j in range(shape[1]):
+  #       if -0.1 < world[i][j] < 0.2 and -0.2 < oh_really < 0:
+  #         isthmi.append((i,j))
+  #         world[i][j]=(0.2-abs(oh_really))/0.05
+  #         temp[i][j] = 1.2*(40+(-70*abs(((shape[0]//2)-i)/shape[0]))-(5*absign))+35*abs(((shape[0]//2)-i)/shape[0])**2-1.5
+  #         mo[i][j] = abs((0.5-abs(((shape[0]//2)-i)/shape[0]))**1.8*800-(75*(8<(abs(((shape[0]//2)-i)/shape[0])*180)<35)-25*(50<(abs(((shape[0]//2)-i)/shape[0])*180)<60)+(35*(13<(abs(((shape[0]//2)-i)/shape[0])*180)<32)))-10+assign*5)
+  # print(len(isthmi))
+  print('loading geological ages')
+  for i in range(shape[0]) :
+    for j in range(shape[1]) :
+      dante=1
+      if i == 128 and j==0 :
+          print('loading water distances')
+      for x in [scale//30,scale//15,scale//10,(scale//15)*2,scale//6,scale//5] :
+        for y,z in [(1,0),(2**0.5,2**0.5),(0,1),(-(2**0.5),2**0.5),(-1,0),(-(2**0.5),-(2**0.5)),(0,-1),(2**0.5,-(2**0.5))] :
+          try:
+            if world[i+round(x*1.5*y)][j+round(x*1.5*z)] <= 0 :
+              age[i][j]=dante+4*noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=(seed+notherseed))
+              break
+          except :
+            break
+        dante+=1
+      if world[i][j]==(3+sin(30*noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=(seed+notherseed))+noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=(seed)))) :
+        age[i][j]=6
+  print('scaling')
+  age*=2
+  world*=2
+  print('loading moisture')
+  for i in range(shape[0]) :
+    for j in range(shape[1]) :
+      mo[i][j]=abs(mo[i][j]+noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=notherseed)*20+12.5+(-1*age[i][j]*8+24))
+  age-=5
+  age=((age>0)*age)**2+noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=seed-notherseed)
+  age=(age*((world>0)+0.05)*50)
+  age=(age-age.mean())/(age.var())**0.5
+  ironseed=seed+notherseed
+  copperseed=seed-notherseed
+  goldseed=seed*notherseed
+  uraniumseed=seed//notherseed
+  diamondseed=seed+notherseed*2
+  oilseed=seed*2
+  coalseed=notherseed*2
+  naturalgasseed=oilseed
+  aluminumseed=goldseed+copperseed
+  shadow=(world>0)
+  print('applying rain shadow')
+  landed,weight,land = (0,0,np.zeros(shape))
+  oooh_ghooost=[0,shape[0]//3,shape[0]-2*round(shape[0]/(3.5)),round(2*shape[0]/(3.5)),shape[0]-shape[0]//3,shape[0]]
+  for lol in range(len(oooh_ghooost)-1) :
+    for i in range(oooh_ghooost[lol],oooh_ghooost[lol+1]) :
+      if lol%2 :
+        for j in reversed(list(range(shape[1]))) :
+          if shadow[i][j] :
+            landed += 0.7
+          if world[i][j] > 4 :
+            landed += world[i][j]*0.7
+          if not shadow[i][j] :
+            landed = 0
+          land[i][j]=landed
+          landed*=0.98
+      else :
+        for j in range(shape[1]) :
+          if shadow[i][j] :
+            landed += 0.7
+          if world[i][j] > 4 :
+            landed += world[i][j]*0.7
+          if not shadow[i][j] :
+            landed = 0
+          land[i][j]=landed
+          landed*=0.98
+  if 'paradise' not in world_type:
+    mo=(mo/(land/10+0.35))
+  biomes=np.zeros(shape+(3,))
+  biome=[]
+  jungle=0
+  savanna=0
+  desert=0
+  treed=0
+  taiga=0
+  frozen=0
+  plains=0
+  mountains=0
+  equatorial=(0,0.5,0)
+  tropical=(0.5,1,0)
+  savannah=(0.5,0.7,0)
+  subtropical=(1,0.3,0)
+  mediterranean=(1,0.7,0)
+  warmforest=(0.3,1,0)
+  forest=(0,0.7,0)
+  prarie=(0.3,0,0)
+  boreal=(0,0.3,0)
+  arctic=(1,1,1)
+  mountain=(0.5,0.4,0.3)
+  continental_mountain=(0.7,0.7,0.7)
+  plateau=(0,0,0)
+  beach=(0.8,0.8,0)
+  for i in range(shape[0]) :
+    l_biome=[]
+    for j in range(shape[1]) :
+      if temp[i][j] <= 7 and world[i][j]<0 or world[i][j]>0 and temp[i][j]<0 or world[i][j]>0 and mo[i][j]<10 and temp[i][j]<4:
+        biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=(0.75+(world[i][j]<0)*0.25,0.75+(world[i][j]<0)*0.25,0.75+(world[i][j]<0)*0.25)
+        l_biome.append("arctic")
+        frozen+=1/(shape[0]*shape[1])
+      elif world[i][j] < 0 :
+        const=1
+        biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=(0,(1-(world[i][j]//const)/(-3))*(temp[i][j]+5)/40,(temp[i][j]+5)/40)
+        l_biome.append("ocean")
+      elif world[i][j] > 3.5:
+        if 0.16<noise.pnoise2(i/scale,j/scale,octaves=octaves,persistence=persistence,lacunarity=lacunarity,repeatx=shape[0],repeaty=shape[1],base=(seed+notherseed))<0.2 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=continental_mountain
+          l_biome.append("continental_mountain")
+        else :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=mountain
+          l_biome.append("mountain")
+        mountains+=1/(shape[0]*shape[1])
+      elif mo[i][j]>15 and temp[i][j]>-15 and temp[i][j]<0 :
+        biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=boreal
+        l_biome.append("forest")
+      elif mo[i][j] > 100 :
+        if temp[i][j]>22 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=equatorial
+          jungle+=1/(shape[0]*shape[1])
+          l_biome.append("jungle")
+        else :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=forest
+          treed+=1/(shape[0]*shape[1])
+          l_biome.append("forest")
+      elif mo[i][j] > 20 :
+        if temp[i][j] > 21 and mo[i][j]>40 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=tropical
+          l_biome.append("savanna")
+          if mo[i][j] > 70 :
+            jungle+=1/(shape[0]*shape[1])
+          else :
+            savanna+=1/(shape[0]*shape[1])
+        elif temp[i][j] > 21 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=savannah
+          l_biome.append("savanna")
+          savanna+=1/(shape[0]*shape[1])
+        elif temp[i][j] > 16 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=warmforest
+          treed+=1/(shape[0]*shape[1])
+          l_biome.append("forest")
+        elif temp[i][j] > 10 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=forest
+          treed+=1/(shape[0]*shape[1])
+          l_biome.append("forest")
+        else :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=boreal
+          taiga+=1/(shape[0]*shape[1])
+          l_biome.append("forest")
+      else :
+        if temp[i][j] > 22 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=subtropical
+          desert+=1/(shape[0]*shape[1])
+          l_biome.append("desert")
+        elif temp[i][j] > 10 and mo[i][j]>15:
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=mediterranean
+          plains+=1/(shape[0]*shape[1])
+          l_biome.append("plains")
+        elif -15<temp[i][j]<5 and mo[i][j]>10 :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=boreal
+          taiga+=1/(shape[0]*shape[1])
+          l_biome.append("forest")
+        else :
+          biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=prarie
+          plains+=1/(shape[0]*shape[1])
+          l_biome.append("plains")
+      if 0 < world[i][j] < 0.01 :
+        biomes[i][j][0],biomes[i][j][1],biomes[i][j][2]=beach
+        l_biome.append("beach")
+    biome.append(l_biome)
+  print(biome)
+  print(desert/np.mean(world>0))
+  mo*=25
+  print('rainfall is now in mm, enjoy')
+  return biomes,world,temp,mo,age,biome
+mike=generator(input())
+imshow(mike[0])
